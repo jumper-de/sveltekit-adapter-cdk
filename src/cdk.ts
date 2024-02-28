@@ -39,8 +39,8 @@ import { fileURLToPath } from "url";
 import { manifest, prerendered } from "MANIFEST_DEST";
 
 export interface SvelteKitProps extends FunctionOptions {
-  readonly domainNames: Array<string>;
-  readonly certificate: ICertificate;
+  readonly domainNames?: Array<string>;
+  readonly certificate?: ICertificate;
   readonly runtime?: Runtime;
   readonly awsSdkConnectionReuse?: boolean;
   readonly depsLockFilePath?: string;
@@ -89,12 +89,6 @@ export class SvelteKit extends Construct {
         ignorePublicAcls: false,
         restrictPublicBuckets: false,
       }),
-      cors: [
-        {
-          allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
-          allowedOrigins: props.domainNames,
-        },
-      ],
     });
 
     new BucketDeployment(this, "ClientBucketDeployment", {
@@ -124,12 +118,6 @@ export class SvelteKit extends Construct {
         ignorePublicAcls: false,
         restrictPublicBuckets: false,
       }),
-      cors: [
-        {
-          allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
-          allowedOrigins: props.domainNames,
-        },
-      ],
     });
 
     if (prerendered.size) {
@@ -196,6 +184,22 @@ export class SvelteKit extends Construct {
           origin: bucketOrigin,
         },
       },
+    });
+
+    clientBucket.addCorsRule({
+      allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
+      allowedOrigins: [
+        ...(props.domainNames || []),
+        this.cloudFront.domainName,
+      ],
+    });
+
+    prerenderedBucket.addCorsRule({
+      allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
+      allowedOrigins: [
+        ...(props.domainNames || []),
+        this.cloudFront.domainName,
+      ],
     });
 
     manifest.assets.forEach((asset) => {
