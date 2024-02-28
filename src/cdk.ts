@@ -89,6 +89,12 @@ export class SvelteKit extends Construct {
         ignorePublicAcls: false,
         restrictPublicBuckets: false,
       }),
+      cors: [
+        {
+          allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
+          allowedOrigins: ["*"],
+        },
+      ],
     });
 
     new BucketDeployment(this, "ClientBucketDeployment", {
@@ -118,6 +124,12 @@ export class SvelteKit extends Construct {
         ignorePublicAcls: false,
         restrictPublicBuckets: false,
       }),
+      cors: [
+        {
+          allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
+          allowedOrigins: ["*"],
+        },
+      ],
     });
 
     if (prerendered.size) {
@@ -184,22 +196,6 @@ export class SvelteKit extends Construct {
           origin: bucketOrigin,
         },
       },
-    });
-
-    clientBucket.addCorsRule({
-      allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
-      allowedOrigins: [
-        ...(props.domainNames || []),
-        this.cloudFront.domainName,
-      ],
-    });
-
-    prerenderedBucket.addCorsRule({
-      allowedMethods: [HttpMethods.GET, HttpMethods.HEAD],
-      allowedOrigins: [
-        ...(props.domainNames || []),
-        this.cloudFront.domainName,
-      ],
     });
 
     manifest.assets.forEach((asset) => {

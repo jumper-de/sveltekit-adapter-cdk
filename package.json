@@ -1,6 +1,6 @@
 {
   "name": "@flit/sveltekit-adapter-cdk",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Jumper Systems' cdk library",
   "keywords": [
     "aws",
