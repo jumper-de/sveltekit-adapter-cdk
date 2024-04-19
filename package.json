@@ -1,6 +1,6 @@
 {
   "name": "@flit/sveltekit-adapter-cdk",
-  "version": "1.0.8",
+  "version": "1.2.1",
   "description": "Jumper Systems' cdk library",
   "keywords": [
     "aws",
@@ -24,30 +24,47 @@
   "types": "./dist/index.d.ts",
   "files": [
     "./dist",
+    "./LICENSE.txt",
     "./README.md"
   ],
   "scripts": {
     "build": "npm run prepack",
     "prepack": "rm -rf ./dist && tsc -b"
   },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-packagejson"
+    ],
+    "tabWidth": 2,
+    "overrides": [
+      {
+        "files": "*.sublime-project",
+        "options": {
+          "parser": "json",
+          "singleQuote": false
+        }
+      }
+    ]
+  },
   "dependencies": {
-    "@jill64/types-lambda": "^1.1.2",
-    "@types/node": "^20.11.19",
-    "prettier-plugin-packagejson": "^2.4.11",
-    "prettier-plugin-svelte": "^3.2.1",
+    "@jill64/types-lambda": "^1.1.4",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
-    "@sveltejs/kit": "^2.5.0",
-    "@types/aws-lambda": "^8.10.133",
-    "aws-cdk-lib": "^2.100.0",
-    "rollup": "^4.11.0"
+    "@sveltejs/kit": "^2.5.6",
+    "@types/aws-lambda": "^8.10.137",
+    "@types/node": "^20.12.7",
+    "aws-cdk-lib": "^2.130.0",
+    "prettier-plugin-packagejson": "^2.5.0",
+    "prettier-plugin-svelte": "^3.2.3",
+    "rollup": "^4.14.3"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
-    "typescript": "^5.3.3"
+    "typescript": "^5.4.5"
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "stability": "stable"
 }

@@ -4,16 +4,11 @@ import type { awslambda as AwsLambda } from "@jill64/types-lambda";
 
 declare const awslambda: typeof AwsLambda;
 
-let INIT = false;
 const SERVER = new Server(manifest);
+await SERVER.init({ env: process.env as any });
 
 export const handler = awslambda.streamifyResponse(
   async (event, responseStream) => {
-    if (!INIT) {
-      await SERVER.init({ env: process.env as Record<string, string> });
-      INIT = true;
-    }
-
     const method = event.requestContext.http.method;
     const encoding = event.isBase64Encoded
       ? "base64"

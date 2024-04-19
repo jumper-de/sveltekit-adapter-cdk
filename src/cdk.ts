@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Duration, Fn, RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import {
   Distribution,
   ViewerProtocolPolicy,
@@ -12,7 +12,10 @@ import {
   Function,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
-import { HttpOrigin, S3Origin } from "aws-cdk-lib/aws-cloudfront-origins";
+import {
+  FunctionUrlOrigin,
+  S3Origin,
+} from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   BlockPublicAccess,
   Bucket,
@@ -20,13 +23,16 @@ import {
   HttpMethods,
   ObjectOwnership,
 } from "aws-cdk-lib/aws-s3";
-import { BundlingOptions, NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import {
+  BundlingOptions,
+  NodejsFunction,
+  OutputFormat,
+} from "aws-cdk-lib/aws-lambda-nodejs";
 import {
   BucketDeployment,
   CacheControl,
   Source,
 } from "aws-cdk-lib/aws-s3-deployment";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import {
   Alias,
   FunctionOptions,
@@ -59,7 +65,14 @@ export class SvelteKit extends Construct {
 
     this.lambda = new NodejsFunction(this, "Server", {
       ...props,
-      entry: fileURLToPath(new URL("./server/index.js", import.meta.url).href),
+      entry: fileURLToPath(
+        new URL(
+          props.bundling?.format === OutputFormat.ESM
+            ? "./server/index.esm.js"
+            : "./server/index.cjs.js",
+          import.meta.url,
+        ).href,
+      ),
       bundling: {
         ...props.bundling,
         mainFields: ["module", "main"],
@@ -99,7 +112,6 @@ export class SvelteKit extends Construct {
 
     new BucketDeployment(this, "ClientBucketDeployment", {
       destinationBucket: clientBucket,
-      logRetention: RetentionDays.ONE_DAY,
       accessControl: BucketAccessControl.PUBLIC_READ,
       sources: [
         Source.asset(fileURLToPath(new URL("./client", import.meta.url).href)),
@@ -135,7 +147,6 @@ export class SvelteKit extends Construct {
     if (prerendered.size) {
       new BucketDeployment(this, "PrerenderedBucketDeployment", {
         destinationBucket: prerenderedBucket,
-        logRetention: RetentionDays.ONE_DAY,
         accessControl: BucketAccessControl.PUBLIC_READ,
         sources: [
           Source.asset(
@@ -150,7 +161,8 @@ export class SvelteKit extends Construct {
       });
     }
 
-    const bucketOrigin = new S3Origin(clientBucket);
+    const clientBucketOrigin = new S3Origin(clientBucket);
+    const prerenderedBucketOrigin = new S3Origin(prerenderedBucket);
 
     this.cloudFront = new Distribution(this, "CloudFront", {
       domainNames: props.domainNames,
@@ -161,17 +173,11 @@ export class SvelteKit extends Construct {
         originRequestPolicy: OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachePolicy: CachePolicy.CACHING_DISABLED,
-        origin: new HttpOrigin(
-          Fn.select(
-            2,
-            Fn.split(
-              "/",
-              this.alias.addFunctionUrl({
-                authType: FunctionUrlAuthType.NONE,
-                invokeMode: InvokeMode.RESPONSE_STREAM,
-              }).url,
-            ),
-          ),
+        origin: new FunctionUrlOrigin(
+          this.alias.addFunctionUrl({
+            authType: FunctionUrlAuthType.NONE,
+            invokeMode: InvokeMode.RESPONSE_STREAM,
+          }),
         ),
         functionAssociations: [
           {
@@ -193,21 +199,33 @@ export class SvelteKit extends Construct {
           originRequestPolicy:
             OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
-          origin: bucketOrigin,
+          origin: clientBucketOrigin,
         },
       },
     });
 
     manifest.assets.forEach((asset) => {
-      if (asset.toLowerCase() === ".ds_store") {
-        return;
+      if (asset.toLowerCase() !== ".ds_store") {
+        this.cloudFront.addBehavior(asset, clientBucketOrigin, {
+          viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          originRequestPolicy:
+            OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+          allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
+        });
       }
+    });
 
-      this.cloudFront.addBehavior(asset, bucketOrigin, {
-        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        originRequestPolicy: OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-        allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
-      });
+    prerendered.forEach((asset) => {
+      this.cloudFront.addBehavior(
+        asset.replace("/index.html", ""),
+        prerenderedBucketOrigin,
+        {
+          viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          originRequestPolicy:
+            OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+          allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
+        },
+      );
     });
   }
 }

@@ -73,8 +73,22 @@ export default function (props: AdapterProps) {
       );
 
       builder.copy(
-        fileURLToPath(new URL("./handler.js", import.meta.url).href),
-        `${tmp}/index.js`,
+        fileURLToPath(new URL("./handler.cjs.js", import.meta.url).href),
+        `${tmp}/index.cjs.js`,
+        {
+          replace: {
+            ENV_DEST: "./env.js",
+            MANIFEST_DEST: "./manifest.js",
+            SERVER_DEST: "./server/index.js",
+            SHIMS_DEST: "./shims.js",
+            ENV_PREFIX_DEST: JSON.stringify(envPrefix),
+          },
+        },
+      );
+
+      builder.copy(
+        fileURLToPath(new URL("./handler.esm.js", import.meta.url).href),
+        `${tmp}/index.esm.js`,
         {
           replace: {
             ENV_DEST: "./env.js",
@@ -90,7 +104,8 @@ export default function (props: AdapterProps) {
 
       const bundle = await rollup({
         input: {
-          index: `${tmp}/index.js`,
+          "index.cjs": `${tmp}/index.cjs.js`,
+          "index.esm": `${tmp}/index.esm.js`,
           manifest: `${tmp}/manifest.js`,
         },
         output: {
