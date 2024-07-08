@@ -10,6 +10,7 @@ import {
   FunctionEventType,
   FunctionCode,
   Function,
+  LambdaEdgeEventType,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import {
@@ -34,13 +35,14 @@ import {
   Source,
 } from "aws-cdk-lib/aws-s3-deployment";
 import {
-  Alias,
+  Code,
   FunctionOptions,
   FunctionUrlAuthType,
   InvokeMode,
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { fileURLToPath } from "url";
+import { EdgeFunction } from "aws-cdk-lib/aws-cloudfront/lib/experimental";
 
 import { manifest, prerendered } from "MANIFEST_DEST";
 
@@ -52,12 +54,10 @@ export interface SvelteKitProps extends FunctionOptions {
   readonly depsLockFilePath?: string;
   readonly bundling?: BundlingOptions;
   readonly projectRoot?: string;
-  readonly provisionedConcurrentExecutions?: number;
 }
 
 export class SvelteKit extends Construct {
   public readonly lambda: NodejsFunction;
-  public readonly alias: Alias;
   public readonly cloudFront: Distribution;
 
   constructor(scope: Construct, id: string, props: SvelteKitProps) {
@@ -80,14 +80,6 @@ export class SvelteKit extends Construct {
           "--conditions": "module",
         },
       },
-    });
-
-    const lambdaVersion = this.lambda.currentVersion;
-
-    this.alias = new Alias(this, "Alias", {
-      aliasName: "Prod",
-      version: lambdaVersion,
-      provisionedConcurrentExecutions: props.provisionedConcurrentExecutions,
     });
 
     const clientBucket = new Bucket(this, "ClientBucket", {
@@ -174,21 +166,74 @@ export class SvelteKit extends Construct {
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachePolicy: CachePolicy.CACHING_DISABLED,
         origin: new FunctionUrlOrigin(
-          this.alias.addFunctionUrl({
-            authType: FunctionUrlAuthType.NONE,
+          this.lambda.addFunctionUrl({
+            authType: FunctionUrlAuthType.AWS_IAM,
             invokeMode: InvokeMode.RESPONSE_STREAM,
           }),
         ),
-        functionAssociations: [
+        edgeLambdas: [
           {
-            eventType: FunctionEventType.VIEWER_REQUEST,
-            function: new Function(this, "XForwardHost", {
-              code: FunctionCode.fromInline(`
-                function handler(event) {
-                  var request = event.request;
-                  request.headers['x-forwarded-host'] = {value: request.headers.host.value};
+            eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+            functionVersion: new EdgeFunction(this, "EdgeFunction", {
+              handler: "index.handler",
+              runtime: Runtime.NODEJS_LATEST,
+              code: Code.fromInline(`
+                import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
+                import { HttpRequest } from "@aws-sdk/protocol-http";
+                import { SignatureV4 } from "@aws-sdk/signature-v4";
+                import { createHash, createHmac } from "node:crypto";
+
+                function Sha256(secret) {
+                  return secret ? createHmac("sha256", secret) : createHash("sha256");
+                }
+
+                const credentialProvider = fromNodeProviderChain();
+                const credentials = await credentialProvider();
+
+                export async function handler(event) {
+                  const request = event.Records[0].cf.request;
+
+                  let headers = request.headers;
+                  delete headers["x-forwarded-for"];
+
+                  const hostname = request.headers["host"][0].value;
+                  const path =
+                    request.uri + (request.querystring ? "?" + request.querystring : "");
+
+                  const req = new HttpRequest({
+                    hostname,
+                    path,
+                    body:
+                      request.body && request.body.data
+                        ? Buffer.from(request.body.data, request.body.encoding)
+                        : undefined,
+                    method: request.method,
+                  });
+                  for (const header of Object.values(headers)) {
+                    req.headers[header[0].key] = header[0].value;
+                  }
+                  req.headers["x-forwarded-host"] = request.headers["host"][0].value;
+
+                  const signer = new SignatureV4({
+                    credentials,
+                    region: "eu-central-1",
+                    service: "lambda",
+                    sha256: Sha256,
+                  });
+
+                  const signedRequest = await signer.sign(req);
+
+                  for (const header in signedRequest.headers) {
+                    request.headers[header.toLowerCase()] = [
+                      {
+                        key: header,
+                        value: signedRequest.headers[header].toString(),
+                      },
+                    ];
+                  }
                   return request;
-                }`),
+                }
+              `),
             }),
           },
         ],

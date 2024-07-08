@@ -13,40 +13,25 @@ export const handler = awslambda.streamifyResponse(
     const encoding = event.isBase64Encoded
       ? "base64"
       : event.headers["content-encoding"] || "utf-8";
-    const body = ["GET", "DELETE"].includes(method)
-      ? undefined
-      : typeof event.body === "string"
-        ? Buffer.from(event.body, encoding as BufferEncoding)
-        : event.body;
+    const body =
+      method === "GET" || method === "DELETE"
+        ? undefined
+        : Buffer.from(event.body, encoding as BufferEncoding);
     const request = new Request(
       new URL(
-        `${event.rawPath}${
-          event.rawQueryString ? `?${event.rawQueryString}` : ""
-        }`,
+        `${event.rawPath}?${event.rawQueryString}`,
         `${event.headers["x-forwarded-proto"]}://${event.headers["x-forwarded-host"]}`,
       ),
-      { method, body },
+      { method, body, headers: event.headers },
     );
-
-    Object.keys(event.headers).forEach((key) => {
-      request.headers.append(key, event.headers[key]);
-    });
 
     const response = await SERVER.respond(request, {
       getClientAddress: () => event.requestContext.http.sourceIp,
     });
 
-    const headers: [string, string][] = [];
-
-    response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== "set-cookie") {
-        headers.push([key, value]);
-      }
-    });
-
     responseStream = awslambda.HttpResponseStream.from(responseStream, {
       statusCode: response.status,
-      headers: Object.fromEntries(headers),
+      headers: Object.fromEntries(response.headers),
       // @ts-ignore
       cookies: response.headers.getSetCookie(),
     });

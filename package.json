@@ -1,7 +1,7 @@
 {
   "name": "@flit/sveltekit-adapter-cdk",
-  "version": "1.2.1",
-  "description": "Jumper Systems' cdk library",
+  "version": "1.5.2",
+  "description": "SvelteKit adapter for AWS",
   "keywords": [
     "aws",
     "awscdk",
@@ -13,7 +13,7 @@
     "type": "git",
     "url": "https://github.com/jumper-de/sveltekit-adapter-cdk.git"
   },
-  "license": "Apache-2.0",
+  "license": "Apache-2.0g",
   "author": {
     "name": "Luis Vierroth",
     "email": "luis@jumper.de",
@@ -47,21 +47,24 @@
     ]
   },
   "dependencies": {
-    "@jill64/types-lambda": "^1.1.4",
-    "@rollup/plugin-commonjs": "^25.0.7",
+    "@aws-sdk/credential-providers": "^3.609.0",
+    "@aws-sdk/protocol-http": "^3.374.0",
+    "@aws-sdk/signature-v4": "^3.374.0",
+    "@jill64/types-lambda": "^1.2.2",
+    "@rollup/plugin-commonjs": "^26.0.1",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.2.3",
-    "@sveltejs/kit": "^2.5.6",
-    "@types/aws-lambda": "^8.10.137",
-    "@types/node": "^20.12.7",
-    "aws-cdk-lib": "^2.130.0",
+    "@sveltejs/kit": "^2.5.18",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.10",
+    "aws-cdk-lib": "^2.100.0",
     "prettier-plugin-packagejson": "^2.5.0",
-    "prettier-plugin-svelte": "^3.2.3",
-    "rollup": "^4.14.3"
+    "prettier-plugin-svelte": "^3.2.5",
+    "rollup": "^4.18.0"
   },
   "devDependencies": {
-    "prettier": "^3.2.5",
-    "typescript": "^5.4.5"
+    "prettier": "^3.3.2",
+    "typescript": "^5.5.3"
   },
   "publishConfig": {
     "access": "public"
