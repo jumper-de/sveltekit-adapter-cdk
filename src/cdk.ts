@@ -14,7 +14,7 @@ import {
 import type { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import {
   FunctionUrlOrigin,
-  S3Origin,
+  S3StaticWebsiteOrigin,
 } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   BlockPublicAccess,
@@ -34,7 +34,7 @@ import {
   Source,
 } from "aws-cdk-lib/aws-s3-deployment";
 import {
-  Code,
+  Alias,
   FunctionOptions,
   FunctionUrlAuthType,
   InvokeMode,
@@ -55,13 +55,14 @@ export interface SvelteKitProps extends FunctionOptions {
 }
 
 export class SvelteKit extends Construct {
-  public readonly lambda: NodejsFunction;
+  public readonly function: NodejsFunction;
+  public readonly functionAlias: Alias;
   public readonly cloudFront: Distribution;
 
   constructor(scope: Construct, id: string, props: SvelteKitProps) {
     super(scope, id);
 
-    this.lambda = new NodejsFunction(this, "Server", {
+    this.function = new NodejsFunction(this, "Server", {
       ...props,
       entry: fileURLToPath(
         new URL(
@@ -78,6 +79,12 @@ export class SvelteKit extends Construct {
           "--conditions": "module",
         },
       },
+    });
+
+    const version = this.function.currentVersion;
+    this.functionAlias = new Alias(this, "Alias", {
+      aliasName: "live",
+      version,
     });
 
     const clientBucket = new Bucket(this, "ClientBucket", {
@@ -151,8 +158,10 @@ export class SvelteKit extends Construct {
       });
     }
 
-    const clientBucketOrigin = new S3Origin(clientBucket);
-    const prerenderedBucketOrigin = new S3Origin(prerenderedBucket);
+    const clientBucketOrigin = new S3StaticWebsiteOrigin(clientBucket);
+    const prerenderedBucketOrigin = new S3StaticWebsiteOrigin(
+      prerenderedBucket,
+    );
 
     this.cloudFront = new Distribution(this, "CloudFront", {
       domainNames: props.domainNames,
@@ -164,7 +173,7 @@ export class SvelteKit extends Construct {
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachePolicy: CachePolicy.CACHING_DISABLED,
         origin: new FunctionUrlOrigin(
-          this.lambda.addFunctionUrl({
+          this.functionAlias.addFunctionUrl({
             authType: FunctionUrlAuthType.NONE,
             invokeMode: InvokeMode.RESPONSE_STREAM,
           }),

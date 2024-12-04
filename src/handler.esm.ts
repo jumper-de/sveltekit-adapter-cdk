@@ -32,7 +32,6 @@ export const handler = awslambda.streamifyResponse(
     responseStream = awslambda.HttpResponseStream.from(responseStream, {
       statusCode: response.status,
       headers: Object.fromEntries(response.headers),
-      // @ts-ignore
       cookies: response.headers.getSetCookie(),
     });
 
