@@ -44,12 +44,17 @@ export default function (props: AdapterProps) {
 
       writeFileSync(
         `${tmp}/manifest.js`,
-        `export const manifest = ${builder.generateManifest({
-          relativePath: "./server/",
-        })};\n\n` +
+        [
+          `export const manifest = ${builder.generateManifest({
+            relativePath: "./",
+          })};`,
           `export const prerendered = new Set(${JSON.stringify(
             builder.prerendered.paths,
-          )});\n`,
+          )});`,
+          `export const base = ${JSON.stringify(
+            builder.config.kit.paths.base,
+          )};`,
+        ].join("\n\n"),
       );
 
       builder.copy(
@@ -117,7 +122,7 @@ export default function (props: AdapterProps) {
           ),
         ],
         plugins: [
-          nodeResolve({ preferBuiltins: true }),
+          nodeResolve({ preferBuiltins: true, exportConditions: ["node"] }),
           commonjs({ strictRequires: true }),
           json(),
         ],
