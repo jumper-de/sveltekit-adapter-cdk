@@ -1,5 +1,5 @@
 import { Adapter } from "@sveltejs/kit";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import { rollup } from "rollup";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
@@ -42,21 +42,6 @@ export default function (props: AdapterProps) {
 
       builder.writeServer(`${tmp}/server`);
 
-      writeFileSync(
-        `${tmp}/manifest.js`,
-        [
-          `export const manifest = ${builder.generateManifest({
-            relativePath: "./",
-          })};`,
-          `export const prerendered = new Set(${JSON.stringify(
-            builder.prerendered.paths,
-          )});`,
-          `export const base = ${JSON.stringify(
-            builder.config.kit.paths.base,
-          )};`,
-        ].join("\n\n"),
-      );
-
       builder.copy(
         fileURLToPath(new URL("./cdk.js", import.meta.url).href),
         `${out}/index.js`,
@@ -83,7 +68,7 @@ export default function (props: AdapterProps) {
         {
           replace: {
             ENV_DEST: "./env.js",
-            MANIFEST_DEST: "./manifest.js",
+            MANIFEST_DEST: "./server/manifest.js",
             SERVER_DEST: "./server/index.js",
             SHIMS_DEST: "./shims.js",
             ENV_PREFIX_DEST: JSON.stringify(envPrefix),
@@ -97,7 +82,7 @@ export default function (props: AdapterProps) {
         {
           replace: {
             ENV_DEST: "./env.js",
-            MANIFEST_DEST: "./manifest.js",
+            MANIFEST_DEST: "./server/manifest.js",
             SERVER_DEST: "./server/index.js",
             SHIMS_DEST: "./shims.js",
             ENV_PREFIX_DEST: JSON.stringify(envPrefix),
@@ -111,7 +96,7 @@ export default function (props: AdapterProps) {
         input: {
           "index.cjs": `${tmp}/index.cjs.js`,
           "index.esm": `${tmp}/index.esm.js`,
-          manifest: `${tmp}/manifest.js`,
+          manifest: `${tmp}/server/manifest.js`,
         },
         output: {
           sourcemap: false,
